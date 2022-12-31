@@ -9,6 +9,7 @@ Gtk = "4c0ca9eb-093a-5379-98c5-f87ac0bbbf44"
 GtkObservables = "8710efd8-4ad6-11eb-33ea-2d5ceb25a41c"
 Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
 Rotations = "6038ab10-8711-5258-84ad-4b1120ba62dc"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 julia = "1"

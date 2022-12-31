@@ -3,11 +3,13 @@
 kwargs:
 `lbl` is window name. 
 `clim` is contrast limit. .
+`xrot_init`, `yrot_init`, `zrot_init` in degree for the initial rotations
 default: 
 lbl = "imsliceGUI"
 clim = (0, maximum(img))
+xrot_init = yrot_init = zrot_init = 0
 """
-function imslice_gui(img; lbl = "imsliceGUI", clim = (0, maximum(img)))
+function imslice_gui(img; lbl = "imsliceGUI", clim = (0, maximum(img)), xrot_init = 0, yrot_init = 0, zrot_init = 0)
   scalefun = scaleminmax(clim...)
   img = scalefun.(img)
 
@@ -26,10 +28,11 @@ function imslice_gui(img; lbl = "imsliceGUI", clim = (0, maximum(img)))
 	set_gtk_property!(c, :expand, true)
 	
 	#### Draw functions
-	sl_xrot[] = 0
-	sl_yrot[] = 0
-	sl_zrot[] = 0
-	sl_fr[] = 1
+  tform = Vector{AffineMap{RotXYZ{Float64}, StaticArraysCore.SVector{3, Float64}}}(undef, 1)
+	sl_xrot[] = xrot_init
+	sl_yrot[] = yrot_init
+	sl_zrot[] = zrot_init
+	sl_fr[] = 1 #Depending on the frame range, this value may change in the below.
 	action = map(sl_xrot, sl_yrot, sl_zrot, sl_fr) do xrot, yrot, zrot, fr
 	  tfm = recenter(RotXYZ(π/180*xrot[],π/180*yrot[],π/180*last(zrot[])), Images.center(img))
 	  imgw = warpedview(img, tfm, 0)
@@ -44,7 +47,7 @@ function imslice_gui(img; lbl = "imsliceGUI", clim = (0, maximum(img)))
 	     ctx = getgc(cnvs)
 	     copy!(ctx, img)
 	  end
-	  nothing
+    tform[1] = tfm
 	end
 	
 	#### text box
@@ -132,6 +135,7 @@ function imslice_gui(img; lbl = "imsliceGUI", clim = (0, maximum(img)))
 	g[1:8,3] = c
 	push!(win, g)
 	showall(win) ## Show all
+  return(tform)
 end
 
 ## Draw
