@@ -1,5 +1,4 @@
-using Gtk, Gtk.ShortNames, GtkObservables, Rotations, CoordinateTransformations, Images, StaticArrays, TestImages
-nmovingfrms = 51
+using Gtk, Gtk.ShortNames, GtkObservables, Rotations, CoordinateTransformations, Images, StaticArrays
 
 #### Sliders
 """
