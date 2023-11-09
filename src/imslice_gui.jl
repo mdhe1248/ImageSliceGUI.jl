@@ -67,10 +67,10 @@ function imslice_gui(img; lbl = "imsliceGUI", clim = (0, maximum(img)), xrot_ini
   yrot_tb = textbox(Int; observable= observable(sl_yrot))
   zrot_tb = textbox(Int; observable= observable(sl_zrot))
   fr_tb = textbox(Int; observable= observable(sl_fr))
-  set_gtk_property!(xrot_tb, :width_chars,4) 
-  set_gtk_property!(yrot_tb, :width_chars,4) 
-  set_gtk_property!(zrot_tb, :width_chars,4) 
-  set_gtk_property!(fr_tb, :width_chars,4) 
+  set_gtk_property!(xrot_tb, :width_chars,4)
+  set_gtk_property!(yrot_tb, :width_chars,4)
+  set_gtk_property!(zrot_tb, :width_chars,4)
+  set_gtk_property!(fr_tb, :width_chars,4)
 
   #### Buttons
   ## xrotation buttons
@@ -128,24 +128,44 @@ function imslice_gui(img; lbl = "imsliceGUI", clim = (0, maximum(img)), xrot_ini
   #### text box: Pair fixed and moving.
   if !isnan(nmovingfrms)
     mv_fx_pairs = [Pair(0, i) for i in 1:nmovingfrms]
-    textstring = map(y -> isnothing(findfirst(x -> x == y, map(k -> first(k), mv_fx_pairs))) ? 0 : findfirst(x -> x == y, map(k -> first(k), mv_fx_pairs)), sl_fr) #If functions are separated, it does not work
+    mv_fx_pairs = convert(Vector{Pair{Int, Union{Nothing, Int}}}, mv_fx_pairs)
+    textstring = map(y -> isnothing(findfirst(map(first, mv_fx_pairs) .== y)) ? 0 : findfirst(map(first, mv_fx_pairs) .== y), sl_fr) #If functions are separated, it does not work
     moving_fr_tb = textbox(Int; observable = textstring)
     map(_ -> textstring[], moving_fr_tb)
-    set_gtk_property!(moving_fr_tb, :width_chars ,4) 
+    set_gtk_property!(moving_fr_tb, :width_chars ,4)
 
     ## Pair button
     pair_but = button("Pair!")
+    n = [false]
+    previous_fx_fr = [0]
+    previous_mv_fr = [0]
     action_pair = map(pair_but) do val
-      println("pushed")
-      fixed_fr = parse(Int, get_gtk_property(fr_tb, "text", String))
-      moving_fr = parse(Int, get_gtk_property(moving_fr_tb, "text", String))
-      p = Pair(fixed_fr, moving_fr)
-      if moving_fr != 0 
-        mv_fx_pairs[moving_fr] = p
+      if n[1] == true
+        fixed_fr = parse(Int, get_gtk_property(fr_tb, "text", String))
+        moving_fr = parse(Int, get_gtk_property(moving_fr_tb, "text", String))
+        if moving_fr != 0
+          previous_fx_fr[1] = first(mv_fx_pairs[moving_fr])
+          if isnothing(findfirst(map(first, mv_fx_pairs) .== fixed_fr))
+            previous_mv_fr[1] = 0
+          else
+            previous_mv_fr[1] = findfirst(map(first, mv_fx_pairs) .== fixed_fr)
+          end
+        end
+        p = Pair(fixed_fr, moving_fr)
+        if moving_fr == 0
+          temp_mv_idx = findfirst(map(first, mv_fx_pairs) .== fixed_fr)
+          mv_fx_pairs[temp_mv_idx] = Pair(0, temp_mv_idx)
+        elseif !isequal(moving_fr, previous_mv_fr[1])
+          mv_fx_pairs[moving_fr] = p
+          if previous_mv_fr[1] != 0
+            mv_fx_pairs[previous_mv_fr[1]] = Pair(0, previous_mv_fr[1])
+          end
+        end
         println(p) #Somehow println function needs to be at the end of if syntax.
       end
+      n[1] = true 
     end
-    ## Grid 
+    ## Grid
     g = GtkGrid()
     g[1,1] = xrot_tb
     g[2,1] = xrot_bxv
@@ -160,7 +180,7 @@ function imslice_gui(img; lbl = "imsliceGUI", clim = (0, maximum(img)), xrot_ini
     g[3:4,2] = sl_yrot
     g[5:6,2] = sl_zrot
     g[7:8,2] = sl_fr
-    g[9,2] = pair_but 
+    g[9,2] = pair_but
     g[1:9,3] = c
     push!(win, g)
     showall(win) ## Show all
@@ -186,6 +206,7 @@ function imslice_gui(img; lbl = "imsliceGUI", clim = (0, maximum(img)), xrot_ini
     return(tform)
   end
 end
+
 
 """ Given the Pairs from imslice_gui, fixed-moving frame pairs will be interpolated
 kwargs: 
