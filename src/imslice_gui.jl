@@ -6,21 +6,23 @@ kwargs:
 `lbl` is window name. 
 `clim` is contrast limit. .
 `xrot_init`, `yrot_init`, `zrot_init` in degree for the initial rotations
-Additionally, `nmovingfrms` should be the number of the moving image frames to be registered.
+Additionally, `movingindices` should be a vector containing the indices of the moving images to be registered.
 default: 
 lbl = "imsliceGUI"
 clim = (0, maximum(img))
 xrot_init = yrot_init = zrot_init = 0
-nmovingfrms = NaN
+movingindices= NaN
 
 tform = imslice_gui(img)
 The output is transform (rotation).
 
-if `nmovingfrms` are given:
-tform, ps = imslice_gui(img; nmovingfrms = 51)
-The outputs are transform (rotation) and reference-moving image pairs.
+if `movingindices` are given, there will be a "Pair" button to pair the fixed z-index and the moving image's section index.
+The outputs are (1) the transform (rotation) matrix of the current view, (2) a vector containing transform matrices for the paired fixed images, and (3) paired indices (reference z and moving sectionID).
+example:
+current_tform, tforms, ps = imslice_gui(img; movingindices = 1:51)
+Note, movingindices should be a vector/range of continuous integers, starting from 1.
 """
-function imslice_gui(img; lbl = "imsliceGUI", clim = (0, maximum(img)), xrot_init = 0, yrot_init = 0, zrot_init = 0, nmovingfrms = NaN)
+function imslice_gui(img; lbl = "imsliceGUI", clim = (0, maximum(img)), xrot_init = 0, yrot_init = 0, zrot_init = 0, movingindices= NaN)
   scalefun = scaleminmax(clim...)
   img = scalefun.(img)
 
@@ -125,11 +127,32 @@ function imslice_gui(img; lbl = "imsliceGUI", clim = (0, maximum(img)), xrot_ini
   push!(fr_bxv, fr_up_but)
   push!(fr_bxv, fr_dn_but)
 
+  if isequal(NaN, movingindices)
+    ## No text box and botton for moving - fixed pair
+    g = GtkGrid()
+    g[1,1] = xrot_tb
+    g[2,1] = xrot_bxv
+    g[3,1] = yrot_tb
+    g[4,1] = yrot_bxv
+    g[5,1] = zrot_tb
+    g[6,1] = zrot_bxv
+    g[7,1] = fr_tb
+    g[8,1] = fr_bxv
+    g[1:2,2] = sl_xrot
+    g[3:4,2] = sl_yrot
+    g[5:6,2] = sl_zrot
+    g[7:8,2] = sl_fr
+    g[1:8,3] = c
+    push!(win, g)
+    showall(win) ## Show all
+    return(tform)
+
   #### text box: Pair fixed and moving.
-  if !isnan(nmovingfrms)
-    mv_fx_pairs = [Pair(0, i) for i in 1:nmovingfrms]
-    mv_fx_pairs = convert(Vector{Pair{Int, Union{Nothing, Int}}}, mv_fx_pairs)
-    textstring = map(y -> isnothing(findfirst(map(first, mv_fx_pairs) .== y)) ? 0 : findfirst(map(first, mv_fx_pairs) .== y), sl_fr) #If functions are separated, it does not work
+  elseif isa(movingindices, AbstractVector)
+    fx_fr_tforms = Vector{AbstractAffineMap}(undef,length(movingindices))
+    fx_mv_pairs = [Pair(nothing, i) for i in movingindices]
+    fx_mv_pairs = convert(Vector{Pair{Union{Nothing, Int}, Union{Nothing, Int}}}, fx_mv_pairs) #This way, fx_mv_pairs can have both nothing and Int.
+    textstring = map(y -> isnothing(findfirst(map(first, fx_mv_pairs) .== y)) ? 0 : findfirst(map(first, fx_mv_pairs) .== y), sl_fr) #If functions are separated, it does not work. Receive text string from slider sl_fr. if sl_fr is the same as mv frame, assign 0. Otherwise, set to be `sl_fr`
     moving_fr_tb = textbox(Int; observable = textstring)
     map(_ -> textstring[], moving_fr_tb)
     set_gtk_property!(moving_fr_tb, :width_chars ,4)
@@ -137,34 +160,49 @@ function imslice_gui(img; lbl = "imsliceGUI", clim = (0, maximum(img)), xrot_ini
     ## Pair button
     pair_but = button("Pair!")
     n = [false]
-    previous_fx_fr = [0]
-    previous_mv_fr = [0]
-    action_pair = map(pair_but) do val
+    previous_fx_fr = Vector{Union{Nothing, Int}}(undef, 1)
+    previous_mv_fr = Vector{Union{Nothing, Int}}(undef, 1)
+    previous_fx_fr[1] = nothing #Default is nothing
+    previous_mv_fr[1] = nothing #Default is nothing 
+    action_pair = map(pair_but) do val #When the button clicked
       if n[1] == true
+        # Get fixed and moving frame index
         fixed_fr = parse(Int, get_gtk_property(fr_tb, "text", String))
         moving_fr = parse(Int, get_gtk_property(moving_fr_tb, "text", String))
-        if moving_fr != 0
-          previous_fx_fr[1] = first(mv_fx_pairs[moving_fr])
-          if isnothing(findfirst(map(first, mv_fx_pairs) .== fixed_fr))
-            previous_mv_fr[1] = 0
-          else
-            previous_mv_fr[1] = findfirst(map(first, mv_fx_pairs) .== fixed_fr)
+        if Pair(fixed_fr, moving_fr) ∈ fx_mv_pairs
+          fx_fr_tforms[moving_fr] = tform[1]
+          println(Pair(fixed_fr, moving_fr)) #Somehow println function needs to be at the end of the "if syntax".
+        else
+          if moving_fr ∈  movingindices #If moving_fr is in moving indices, run the below.
+            previous_fx_fr[1] = first(fx_mv_pairs[moving_fr]) #assign previous_fx_fr as the current fixed_fr.
+            fx_mv_pairs_idx = findfirst(map(first, fx_mv_pairs) .== fixed_fr)
+            if isnothing(fx_mv_pairs_idx) #if `fx_mv_pairs` does not contain the current `fixed_fr`, do nothing. Else, in which `fx_mv_pairs` contains the current `fixed_fr`, update previous_mv_fr.
+              previous_mv_fr[1] = nothing
+            else
+              previous_mv_fr[1] = fx_mv_pairs_idx #fx_mv_pairs_idx is the same as mv_fr.
+            end
+            fx_fr_tforms[moving_fr] = tform[1]
           end
-        end
-        p = Pair(fixed_fr, moving_fr)
-        if moving_fr == 0
-          temp_mv_idx = findfirst(map(first, mv_fx_pairs) .== fixed_fr)
-          mv_fx_pairs[temp_mv_idx] = Pair(0, temp_mv_idx)
-        elseif !isequal(moving_fr, previous_mv_fr[1])
-          mv_fx_pairs[moving_fr] = p
-          if previous_mv_fr[1] != 0
-            mv_fx_pairs[previous_mv_fr[1]] = Pair(0, previous_mv_fr[1])
+          p = Pair(fixed_fr, moving_fr) #pair fixed_frame and moving frame
+          if moving_fr == 0 # If moving_fr is set to be 0, initialize the pair.
+            temp_mv_idx = findfirst(map(first, fx_mv_pairs) .== fixed_fr)
+            if !isnothing(temp_mv_idx)
+              fx_mv_pairs[temp_mv_idx] = Pair(nothing, temp_mv_idx)
+              Base._unsetindex!(fx_fr_tforms, temp_mv_idx)
+            end
+          elseif !isequal(moving_fr, previous_mv_fr[1]) && moving_fr ∈ movingindices #how does it work?
+            if previous_mv_fr[1] != nothing #If the same moving frame was paired with another fixed frame, initialize the pre-existing pair.
+              fx_mv_pairs[previous_mv_fr[1]] = Pair(nothing, previous_mv_fr[1])
+              Base._unsetindex!(fx_fr_tforms, previous_mv_fr[1])
+            end
+            fx_mv_pairs[moving_fr] = p
           end
+          println(p) #Somehow println function needs to be at the end of the "if syntax".
         end
-        println(p) #Somehow println function needs to be at the end of if syntax.
       end
-      n[1] = true 
+      n[1] = true #Somehow, the button is automatically clicked once. So, do nothing for this click.
     end
+
     ## Grid
     g = GtkGrid()
     g[1,1] = xrot_tb
@@ -184,26 +222,7 @@ function imslice_gui(img; lbl = "imsliceGUI", clim = (0, maximum(img)), xrot_ini
     g[1:9,3] = c
     push!(win, g)
     showall(win) ## Show all
-    return(tform, mv_fx_pairs)
-  else !isnan(nmovingfrms)
-    ## No text box and botton for moving - fixed pair
-    g = GtkGrid()
-    g[1,1] = xrot_tb
-    g[2,1] = xrot_bxv
-    g[3,1] = yrot_tb
-    g[4,1] = yrot_bxv
-    g[5,1] = zrot_tb
-    g[6,1] = zrot_bxv
-    g[7,1] = fr_tb
-    g[8,1] = fr_bxv
-    g[1:2,2] = sl_xrot
-    g[3:4,2] = sl_yrot
-    g[5:6,2] = sl_zrot
-    g[7:8,2] = sl_fr
-    g[1:8,3] = c
-    push!(win, g)
-    showall(win) ## Show all
-    return(tform)
+    return(tform, fx_fr_tforms, fx_mv_pairs)
   end
 end
 
@@ -215,8 +234,8 @@ kwargs:
 function update_image_pairs(ps; first_ref_match_frame = NaN, last_ref_match_frame = NaN)
   p1 = copy(ps)
   fxfrms = map(first, p1)
-  idx = findall(fxfrms .> 0) #Find updated pairs
-  if isa(first_ref_match_frame, Int)
+  idx = findall(fxfrms .!= nothing) #Find updated pairs
+  if !isequal(first_ref_match_frame, NaN)
     if first_ref_match_frame != fxfrms[idx[1]]
       if idx[1] == 1
         @warn "The first fixed-moving frame pair will be overwriten."
@@ -224,7 +243,7 @@ function update_image_pairs(ps; first_ref_match_frame = NaN, last_ref_match_fram
       p1[1] = Pair(first_ref_match_frame, 1)
     end
   end
-  if isa(last_ref_match_frame, Int)
+  if !isequal(last_ref_match_frame, NaN)
     if last_ref_match_frame != fxfrms[idx[end]]
       if idx[end] == length(p1) 
         @warn "The last fixed-moving frame pair will be overwriten."
@@ -233,9 +252,9 @@ function update_image_pairs(ps; first_ref_match_frame = NaN, last_ref_match_fram
     end
   end
   fxfrms = map(first, p1)
-  newidx = findall(fxfrms .> 0) #Find updated pairs
+  newidx = findall(fxfrms .!= nothing) #Find updated pairs
   fxfrms_output = Vector{Vector{Int}}() #initialize 
-  for i in 1:length(idx)-1
+  for i in 1:length(newidx)-1
     fxfrms_interp = round.(Int, collect(range(fxfrms[newidx[i]], fxfrms[newidx[i+1]], newidx[i+1]-newidx[i]+1))) #identify fixed frame numbers.
     push!(fxfrms_output, fxfrms_interp[1:end-1])
   end
@@ -244,3 +263,25 @@ function update_image_pairs(ps; first_ref_match_frame = NaN, last_ref_match_fram
   pairout = [Pair(first(v), last(v)) for v in zip(fxfrms_vec, collect(newidx[1]:newidx[end]))]
   return pairout
 end
+
+"""
+Interpolation may be done by degree and warping. but for simplicity, just get the values from the prior vector index.
+The fx_fr_tforms for the first frame must be given.
+"""
+function update_tforms(fx_fr_tforms::Vector; first_fr_tform = NaN)
+  tforms = copy(fx_fr_tforms)
+  if !isequal(first_fr_tform, NaN)
+    @warn "The first tform may be overwritten."
+    tforms[1] = first_fr_tform
+  end
+  keep = isassigned.((tforms,), 1:length(tforms))
+  idx = findall(keep .== 0)
+  for i in idx
+    tforms[i] = tforms[i-1]
+  end
+  tforms
+end
+
+"""Interpolation function"""
+interpfun(x, x1, y1, x2, y2) = y1+((x-x1)*(y2-y1))/(x2-x1)
+interpfun(x, x1, y1::AbstractMatrix, x2, y2::AbstractMatrix) = y1.+((x-x1).*(y2.-y1))./(x2-x1)
