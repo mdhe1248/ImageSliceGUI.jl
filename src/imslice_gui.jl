@@ -1,5 +1,3 @@
-using Gtk, Gtk.ShortNames, GtkObservables, Rotations, CoordinateTransformations, Images, StaticArrays
-
 #### Sliders
 """
 kwargs:

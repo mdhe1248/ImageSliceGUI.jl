@@ -5,7 +5,7 @@ version = "0.1.0"
 
 [deps]
 CoordinateTransformations = "150eb455-5306-5404-9cee-2592286d6298"
-Gtk = "4c0ca9eb-093a-5379-98c5-f87ac0bbbf44"
+Gtk4 = "9db2cae5-386f-4011-9d63-a5602296539b"
 GtkObservables = "8710efd8-4ad6-11eb-33ea-2d5ceb25a41c"
 Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
 Rotations = "6038ab10-8711-5258-84ad-4b1120ba62dc"
