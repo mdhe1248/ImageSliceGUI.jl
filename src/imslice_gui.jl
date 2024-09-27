@@ -102,7 +102,7 @@ function imslice_gui_layout(img; lbl = "imsliceGUI", clim = (0, maximum(img)), x
   fr_bxv = GtkBox(:v)
   push!(fr_bxv, fr_up_but)
   push!(fr_bxv, fr_dn_but)
-  return(win, xrot_tb, xrot_bxv, yrot_tb, yrot_bxv, zrot_tb, zrot_bxv, fr_tb, fr_bxv, sl_xrot, sl_yrot, sl_zrot, sl_fr, c)
+  return(win, xrot_tb, xrot_bxv, yrot_tb, yrot_bxv, zrot_tb, zrot_bxv, fr_tb, fr_bxv, sl_xrot, sl_yrot, sl_zrot, sl_fr, c, tform)
 end
 
 """
@@ -120,7 +120,7 @@ tform = imslice_gui(img)
 The output is transform (rotation).
 """
 function imslice_gui(img; lbl = "imsliceGUI", clim = (0, maximum(img)), xrot_init = 0, yrot_init = 0, zrot_init = 0)
-  win, xrot_tb, xrot_bxv, yrot_tb, yrot_bxv, zrot_tb, zrot_bxv, fr_tb, fr_bxv, sl_xrot, sl_yrot, sl_zrot, sl_fr, c = imslice_gui_layout(img; lbl = lbl, clim = clim, xrot_init = xrot_init, yrot_init = yrot_init, zrot_init = zrot_init)
+  win, xrot_tb, xrot_bxv, yrot_tb, yrot_bxv, zrot_tb, zrot_bxv, fr_tb, fr_bxv, sl_xrot, sl_yrot, sl_zrot, sl_fr, c, tform = imslice_gui_layout(img; lbl = lbl, clim = clim, xrot_init = xrot_init, yrot_init = yrot_init, zrot_init = zrot_init)
   ## No text box and botton for moving - fixed pair
   g = GtkGrid()
   g[1,1] = widget(xrot_tb)
@@ -162,7 +162,7 @@ current_tform, tforms, ps = imslice_gui(img, sectionindices = 1:51)
 Note, `sectionindices` should be a vector/range of continuous integers, starting from 1.
 """
 function imslice_gui(img, sectionindices::AbstractVector; lbl = "imsliceGUI", clim = (0, maximum(img)), xrot_init = 0, yrot_init = 0, zrot_init = 0)
-  win, xrot_tb, xrot_bxv, yrot_tb, yrot_bxv, zrot_tb, zrot_bxv, fr_tb, fr_bxv, sl_xrot, sl_yrot, sl_zrot, sl_fr, c = imslice_gui_layout(img; lbl = lbl, clim = clim, xrot_init = xrot_init, yrot_init = yrot_init, zrot_init = zrot_init)
+  win, xrot_tb, xrot_bxv, yrot_tb, yrot_bxv, zrot_tb, zrot_bxv, fr_tb, fr_bxv, sl_xrot, sl_yrot, sl_zrot, sl_fr, c, tform = imslice_gui_layout(img; lbl = lbl, clim = clim, xrot_init = xrot_init, yrot_init = yrot_init, zrot_init = zrot_init)
   # Pair z-index to section number.
   fx_fr_tforms = Vector{AbstractAffineMap}(undef,length(sectionindices))
   fx_mv_pairs = [Pair(nothing, i) for i in sectionindices]
