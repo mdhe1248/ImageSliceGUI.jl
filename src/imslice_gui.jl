@@ -160,6 +160,7 @@ example:
 current_tform, tforms, ps = imslice_gui(img, sectionindices = 1:51)
 
 Note, `sectionindices` should be a vector/range of continuous integers, starting from 1.
+Pairing with 0 will initialize the pairing.
 """
 function imslice_gui(img, sectionindices::AbstractVector; lbl = "imsliceGUI", clim = (0, maximum(img)), xrot_init = 0, yrot_init = 0, zrot_init = 0)
   win, xrot_tb, xrot_bxv, yrot_tb, yrot_bxv, zrot_tb, zrot_bxv, fr_tb, fr_bxv, sl_xrot, sl_yrot, sl_zrot, sl_fr, c, tform = imslice_gui_layout(img; lbl = lbl, clim = clim, xrot_init = xrot_init, yrot_init = yrot_init, zrot_init = zrot_init)
